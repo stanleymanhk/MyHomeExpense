@@ -46,6 +46,14 @@ class MonthExpense{
   double others;
   
   List<Expense> listExpenses = new List();
+
+  MonthExpense clone(){
+    MonthExpense month = new MonthExpense(this.month, totalAmount, household, wife, kids, others);
+    this.listExpenses.forEach((expense){
+          month.listExpenses.add(expense);          
+      });
+    return month;
+  }
 }
 
 final String TABLE_NAME = "expense";
@@ -59,6 +67,78 @@ final String COL_INPUT_TIME = "inputtime";
 class DBManager{
   Database database;
   Map<int, MonthExpense> months;
+  
+  Future<bool> updateExpense(int index, Expense expense) async {
+    if(!months.containsKey(expense.month)) 
+        months.addAll({expense.month : new MonthExpense(expense.month, 0 , 0, 0,  0, 0)});
+
+    MonthExpense month = months[expense.month].clone();
+    // if update current expense, deduct the amount of month    
+    if (expense.id > 0 && index > 0) 
+          if(index < month.listExpenses.length)
+          {
+            switch (month.listExpenses[index].categoryID) {
+              case 1: // 家居開支        
+                      month.household -= month.listExpenses[index].amount;
+                      break;
+              case 2: // 老婆開支  
+                      month.wife -= month.listExpenses[index].amount;
+                      break;
+              case 3: // 囝囡開支
+                      month.kids -= month.listExpenses[index].amount; 
+                      break;
+              default:// 其他開出                      
+                      month.others -= month.listExpenses[index].amount; 
+                      break;
+            }
+            month.totalAmount -= month.listExpenses[index].amount;
+          }
+    
+    switch (expense.categoryID) {
+      case 1: // 家居開支              
+        month.household += expense.amount;
+        break;
+      case 2: // 老婆開支
+        month.wife += expense.amount;
+        break;
+      case 3: // 囝囡開支
+        month.kids += expense.amount;     
+        break;
+      default:// 其他開出
+        month.others += expense.amount;                       
+        break;
+    }
+    month.totalAmount += expense.amount;
+    if (index < 0) month.listExpenses.insert(0, expense);
+    months[expense.month] = month;
+    return true;
+  }
+
+  Future<bool> removeExpense(int index, Expense expense) async {
+    if(!months.containsKey(expense.month)) return false;
+    MonthExpense month = months[expense.month].clone();
+    
+    if(!(index < 0 || index > month.listExpenses.length - 1)) 
+        month.listExpenses.removeAt(index);
+    switch (expense.categoryID) {
+      case 1: // 家居開支        
+              month.household -= expense.amount;
+              break;
+      case 2: // 老婆開支  
+              month.wife -= expense.amount;
+              break;
+      case 3: // 囝囡開支
+              month.kids -= expense.amount; 
+              break;
+      default:// 其他開出                      
+              month.others -= expense.amount; 
+              break;
+    }
+    month.totalAmount -= expense.amount;
+    months[expense.month] = month;
+    return true;
+  }
+  
   Future openDB() async{
     if (database == null) {
       Directory directory = await getApplicationDocumentsDirectory();
@@ -83,25 +163,7 @@ class DBManager{
         months.addAll({month : new MonthExpense(month, 0 , 0, 0,  0, 0)});
       }
       listExpenses.forEach((expense){
-          if(!months.containsKey(expense.month)) 
-          months.addAll({expense.month : new MonthExpense(expense.month, 0 , 0, 0,  0, 0)});
-          
-          switch (expense.categoryID) {
-            case 1: // 家居開支
-              months[expense.month].household += expense.amount;
-              break;
-            case 2: // 老婆開支
-              months[expense.month].wife += expense.amount;
-              break;
-            case 3: // 囝囡開支
-              months[expense.month].kids += expense.amount;     
-              break;
-            default:// 其他開出
-              months[expense.month].others += expense.amount;                       
-              break;
-          } 
-          months[expense.month].totalAmount += expense.amount;
-          months[expense.month].listExpenses.add(expense);
+          updateExpense(-1, expense);          
       });
        
     }
