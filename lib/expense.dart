@@ -16,7 +16,10 @@ class Expense{
   int typeID;
   double amount;
   DateTime inputTime;
-
+  Expense clone()
+  {
+    return new Expense(this.id, this.month, this.categoryID, this.typeID, this.amount, this.inputTime);
+  }
   Map toMap(){
     return {COL_MONTH : month
           , COL_CATEGORY: categoryID
@@ -74,7 +77,7 @@ class DBManager{
 
     MonthExpense month = months[expense.month].clone();
     // if update current expense, deduct the amount of month    
-    if (expense.id > 0 && index > 0) 
+    if (expense.id > 0 && index > -1) 
           if(index < month.listExpenses.length)
           {
             switch (month.listExpenses[index].categoryID) {
@@ -109,13 +112,26 @@ class DBManager{
         break;
     }
     month.totalAmount += expense.amount;
-    if (index < 0) month.listExpenses.insert(0, expense);
+    if (expense.id  > 0)
+    {
+        if(index < 0) return false;
+        if(!(index < month.listExpenses.length)) return false;
+        await update(expense);
+        month.listExpenses[index] = expense;
+    }
+    else{
+        expense.id = await insert(expense);
+        if (expense.id == 0) return false;
+        month.listExpenses.insert(0, expense);
+    }        
     months[expense.month] = month;
     return true;
   }
 
   Future<bool> removeExpense(int index, Expense expense) async {
     if(!months.containsKey(expense.month)) return false;
+    if(!(expense.id > 0)) return false;
+
     MonthExpense month = months[expense.month].clone();
     
     if(!(index < 0 || index > month.listExpenses.length - 1)) 
@@ -135,6 +151,7 @@ class DBManager{
               break;
     }
     month.totalAmount -= expense.amount;
+    delete(expense.id);
     months[expense.month] = month;
     return true;
   }
@@ -170,7 +187,20 @@ class DBManager{
   }
 
   Future<int> insert(Expense expense) async {
-    return await database.insert(TABLE_NAME, expense.toMap());
+    await database.insert(TABLE_NAME, expense.toMap());
+    List<Map>  entity = await database.rawQuery("select $COL_ID from $TABLE_NAME where $COL_INPUT_TIME ='"+ expense.inputTime.toIso8601String() +"' limit 1");
+    if( entity.length == 0) return 0;
+    return entity[0]["$COL_ID"];
+  }
+
+  Future update(Expense expense) async {
+    await openDB();
+    await database.update(TABLE_NAME, expense.toMap(), where: "$COL_ID = ?", whereArgs: [expense.id]);
+  }
+
+  Future delete(int id) async {
+    await openDB();
+    await database.delete(TABLE_NAME, where: "$COL_ID = ?", whereArgs: [id]);
   }
 
   Future<List<Expense>> getExpenses() async {
@@ -179,16 +209,6 @@ class DBManager{
     return entities
         .map((map) => new Expense.fromMap(map))
         .toList();
-  }
-
-  Future delete(int id) async {
-    await openDB();
-    await database.delete(TABLE_NAME, where: "$COL_ID = ?", whereArgs: [id]);
-  }
-
-  Future update(Expense expense) async {
-    await openDB();
-    await database.update(TABLE_NAME, expense.toMap(), where: "$COL_ID = ?", whereArgs: [expense.id]);
   }
 
   closeDb() {
