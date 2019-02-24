@@ -34,6 +34,20 @@ Map<int, ColorLabel> mapType
 , 21: new ColorLabel(21, "其它", Color.fromARGB(0, 255, 255, 255), Color.fromARGB(0, 0, 0, 255))
 };
 
+
+Map<int, int> mapTypeCategory = { 1:1, 2:1, 3:1, 4:1, 5:1, 6:1, 7:1
+, 8:2, 9:2
+, 10:3, 11:3, 12:3
+, 13:4, 14:4, 15:4, 16:4, 17:4, 18:4, 19:4, 20:4, 21:4};
+
+List<ColorLabel> listCategories = mapCategory.values.toList();
+List<ColorLabel> listTypesInCategory(int category)
+{
+  List<ColorLabel> list = new List<ColorLabel>();
+  mapTypeCategory.forEach((K,V) => V==category? list.add(mapType[K]):null);
+  return list;
+}
+
 class ColorLabel
 {
   ColorLabel(this.id, this.text, this.forecolor, this.backcolor);
